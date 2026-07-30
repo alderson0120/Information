@@ -379,45 +379,50 @@
   }
 
   function switchView(view) {
-    currentView = view;
-    document.querySelectorAll('.view-btn').forEach((b, i) => {
-      b.classList.toggle('active', (i === 0 && view === 'detail') || (i === 1 && view === 'graph'));
-    });
-    if (view === 'detail') {
-      document.getElementById('detail-view').classList.remove('hidden');
-      document.getElementById('graph-view').classList.remove('visible');
-    } else {
-      document.getElementById('detail-view').classList.add('hidden');
-      document.getElementById('graph-view').classList.add('visible');
+  currentView = view;
+
+  document.getElementById('detail-view').classList.toggle('hidden', view !== 'detail');
+  document.getElementById('graph-view').classList.toggle('visible', view === 'graph');
+
+  if (view === 'graph') {
+    setTimeout(() => {
       renderGraph();
-    }
+    }, 100); // small delay helps performance
   }
+}
 
-  function renderGraph() {
-   if (network) return;
-    const container = document.getElementById('graph-container');
-    const nodes = [{ id: 'me', label: 'YOU', color: { background: '#00ff41', border: '#00ff41' }, font: { color: '#0a0a0a' }, size: 30 }];
-    const edges = [];
-    contacts.forEach(c => {
-      nodes.push({ id: c.id, label: c.name, color: { background: '#111', border: '#00ff41' }, font: { color: '#00ff41' } });
-      edges.push({ from: 'me', to: c.id, label: c.relation || '', color: { color: '#333' }, font: { color: '#444', size: 10 } });
-    });
-    const data = { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) };
-   const options = {
-  background: { color: '#0a0a0a' },
-  nodes: { shape: 'box', borderWidth: 1, font: { face: 'Courier New' } },
-  edges: { smooth: false },
-  interaction: { hover: true },
-  physics: false
-};
-    if (!network) {
-  network = new vis.Network(container, data, options);
+function renderGraph() {
+  if (network) return; // prevents re-creation
 
-  network.on('click', params => {
-    if (params.nodes.length && params.nodes[0] !== 'me') {
-      switchView('detail');
-      selectContact(params.nodes[0]);
+  const container = document.getElementById('graph-container');
+
+  const nodes = [
+    { id: 'me', label: 'YOU', color: '#00ff41' }
+  ];
+
+  const edges = [];
+
+  contacts.forEach(c => {
+    nodes.push({ id: c.id, label: c.name });
+    edges.push({ from: 'me', to: c.id });
+  });
+
+  const data = {
+    nodes: new vis.DataSet(nodes),
+    edges: new vis.DataSet(edges)
+  };
+
+  const options = {
+    physics: false,
+    interaction: {
+      hover: false,
+      dragNodes: false,
+      zoomView: false
     }
+  };
+
+  network = new vis.Network(container, data, options);
+}
   });
 }
 
