@@ -392,19 +392,31 @@
 }
 
 function renderGraph() {
-  if (network) return; // prevents re-creation
-
   const container = document.getElementById('graph-container');
 
+  if (!container) return; // safety check
+
   const nodes = [
-    { id: 'me', label: 'YOU', color: '#00ff41' }
+    { id: 'me', label: 'YOU', color: { background: '#00ff41', border: '#00ff41' }, font: { color: '#0a0a0a' }, size: 30 }
   ];
 
   const edges = [];
 
   contacts.forEach(c => {
-    nodes.push({ id: c.id, label: c.name });
-    edges.push({ from: 'me', to: c.id });
+    nodes.push({
+      id: c.id,
+      label: c.name,
+      color: { background: '#111', border: '#00ff41' },
+      font: { color: '#00ff41' }
+    });
+
+    edges.push({
+      from: 'me',
+      to: c.id,
+      label: c.relation || '',
+      color: { color: '#333' },
+      font: { color: '#444', size: 10 }
+    });
   });
 
   const data = {
@@ -413,16 +425,27 @@ function renderGraph() {
   };
 
   const options = {
-    physics: false,
-    interaction: {
-      hover: false,
-      dragNodes: false,
-      zoomView: false
-    }
+    background: { color: '#0a0a0a' },
+    nodes: { shape: 'box', borderWidth: 1, font: { face: 'Courier New' } },
+    edges: { smooth: false },
+    interaction: { hover: true },
+    physics: false
   };
 
+  // 🔥 destroy old graph safely
+  if (network) {
+    network.destroy();
+  }
+
+  // 🔥 create new graph
   network = new vis.Network(container, data, options);
-}
+
+  // 🔥 click event
+  network.on('click', params => {
+    if (params.nodes.length && params.nodes[0] !== 'me') {
+      switchView('detail');
+      selectContact(params.nodes[0]);
+    }
   });
 }
 
