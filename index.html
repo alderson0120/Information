@@ -385,19 +385,30 @@
   document.getElementById('graph-view').classList.toggle('visible', view === 'graph');
 
   if (view === 'graph') {
+   document.getElementById('detail-view').classList.add('hidden');
+  document.getElementById('graph-view').classList.add('visible');
+   
     setTimeout(() => {
       renderGraph();
-    }, 100); // small delay helps performance
+     if (network) network.fit();
+    }, 50); // small delay helps performance
   }
 }
 
 function renderGraph() {
   const container = document.getElementById('graph-container');
 
-  if (!container) return; // safety check
+  // 🔥 IMPORTANT: ensure container has size
+  container.style.height = "500px";
 
   const nodes = [
-    { id: 'me', label: 'YOU', color: { background: '#00ff41', border: '#00ff41' }, font: { color: '#0a0a0a' }, size: 30 }
+    {
+      id: 'me',
+      label: 'YOU',
+      color: { background: '#00ff41', border: '#00ff41' },
+      font: { color: '#0a0a0a' },
+      size: 30
+    }
   ];
 
   const edges = [];
@@ -413,9 +424,7 @@ function renderGraph() {
     edges.push({
       from: 'me',
       to: c.id,
-      label: c.relation || '',
-      color: { color: '#333' },
-      font: { color: '#444', size: 10 }
+      color: { color: '#00ff41' }
     });
   });
 
@@ -425,30 +434,37 @@ function renderGraph() {
   };
 
   const options = {
-    background: { color: '#0a0a0a' },
-    nodes: { shape: 'box', borderWidth: 1, font: { face: 'Courier New' } },
-    edges: { smooth: false },
-    interaction: { hover: true },
-    physics: false
+    physics: false, // keep OFF for performance
+    nodes: {
+      shape: 'dot', // 🔥 more BloodHound style
+      size: 18,
+      font: { color: '#00ff41' },
+      borderWidth: 1
+    },
+    edges: {
+      smooth: false,
+      color: '#00ff41'
+    },
+    interaction: {
+      hover: true
+    }
   };
 
-  // 🔥 destroy old graph safely
-  if (network) {
-    network.destroy();
+  // 🔥 DON'T destroy every time
+  if (!network) {
+    network = new vis.Network(container, data, options);
+
+    network.on('click', params => {
+      if (params.nodes.length && params.nodes[0] !== 'me') {
+        switchView('detail');
+        selectContact(params.nodes[0]);
+      }
+    });
+
+  } else {
+    network.setData(data); // ✅ update instead of recreate
   }
-
-  // 🔥 create new graph
-  network = new vis.Network(container, data, options);
-
-  // 🔥 click event
-  network.on('click', params => {
-    if (params.nodes.length && params.nodes[0] !== 'me') {
-      switchView('detail');
-      selectContact(params.nodes[0]);
-    }
-  });
 }
-
   function openModal() {
     ['modal-name','modal-phone','modal-email-field','modal-address','modal-relation','modal-notes']
       .forEach(id => document.getElementById(id).value = '');
