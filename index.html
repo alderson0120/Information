@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Information</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Courier New', monospace; background: #0a0a0a; color: #00ff41; min-height: 100vh; }
+
+  /* LOGIN */
+  #login-screen {
+    display: flex; flex-direction: column; align-items: center;
+    justify-content: center; height: 100vh; gap: 16px;
+  }
+  #login-screen h1 { font-size: 2rem; letter-spacing: 4px; margin-bottom: 24px; }
+  #login-screen input {
+    background: #111; border: 1px solid #00ff41; color: #00ff41;
+    padding: 10px 16px; width: 280px; font-family: inherit; font-size: 1rem;
+    outline: none;
+  }
+  #login-screen button {
+    background: #00ff41; color: #0a0a0a; border: none;
+    padding: 10px 32px; font-family: inherit; font-size: 1rem;
+    cursor: pointer; font-weight: bold; width: 280px; margin-top: 8px;
+  }
+  #login-screen button:hover { background: #00cc33; }
+  #login-error { color: #ff4444; font-size: 0.85rem; }
+
+  /* MAIN APP */
+  #app { display: none; flex-direction: column; height: 100vh; }
+
+  /* HEADER */
+  #header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 24px; border-bottom: 1px solid #1a1a1a;
+    background: #0d0d0d;
+  }
+  #header h1 { font-size: 1.1rem; letter-spacing: 3px; }
+  #header button {
+    background: none; border: 1px solid #333; color: #666;
+    padding: 6px 14px; font-family: inherit; cursor: pointer; font-size: 0.8rem;
+  }
+  #header button:hover { border-color: #ff4444; color: #ff4444; }
+
+  /* LAYOUT */
+  #main { display: flex; flex: 1; overflow: hidden; }
+
+  /* SIDEBAR */
+  #sidebar {
+    width: 240px; border-right: 1px solid #1a1a1a;
+    display: flex; flex-direction: column; background: #0d0d0d;
+  }
+  #sidebar-header {
+    padding: 12px 16px; border-bottom: 1px solid #1a1a1a;
+    display: flex; align-items: center; gap: 8px;
+  }
+  #search {
+    flex: 1; background: #111; border: 1px solid #222; color: #00ff41;
+    padding: 6px 10px; font-family: inherit; font-size: 0.8rem; outline: none;
+  }
+  #add-btn {
+    background: #00ff41; color: #0a0a0a; border: none;
+    width: 28px; height: 28px; font-size: 1.2rem; cursor: pointer;
+    font-weight: bold; flex-shrink: 0;
+  }
+  #contacts-list { flex: 1; overflow-y: auto; }
+  .contact-item {
+    padding: 10px 16px; cursor: pointer; border-bottom: 1px solid #111;
+    font-size: 0.9rem; transition: background 0.15s;
+  }
+  .contact-item:hover { background: #111; }
+  .contact-item.active { background: #111; border-left: 3px solid #00ff41; }
+  .contact-item .name { color: #00ff41; }
+  .contact-item .preview { color: #444; font-size: 0.75rem; margin-top: 2px; }
+
+  /* VIEW TOGGLE */
+  #view-toggle {
+    display: flex; border-bottom: 1px solid #1a1a1a;
+  }
+  .view-btn {
+    flex: 1; padding: 8px; background: none; border: none;
+    color: #444; font-family: inherit; cursor: pointer; font-size: 0.8rem;
+    letter-spacing: 1px;
+  }
+  .view-btn.active { color: #00ff41; border-bottom: 2px solid #00ff41; }
+
+  /* CONTENT AREA */
+  #content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* DETAIL VIEW */
+  #detail-view { flex: 1; display: flex; flex-direction: column; padding: 24px; overflow-y: auto; }
+  #detail-view.hidden { display: none; }
+  #empty-state { flex: 1; display: flex; align-items: center; justify-content: center; color: #333; }
+
+  #contact-name-display { font-size: 1.4rem; letter-spacing: 2px; margin-bottom: 20px; }
+
+  .field-group { margin-bottom: 16px; }
+  .field-label { color: #444; font-size: 0.75rem; letter-spacing: 2px; margin-bottom: 4px; }
+  .field-value { color: #00ff41; font-size: 0.95rem; }
+  .field-input {
+    background: #111; border: 1px solid #222; color: #00ff41;
+    padding: 8px 12px; font-family: inherit; font-size: 0.9rem;
+    width: 100%; outline: none;
+  }
+  .field-input:focus { border-color: #00ff41; }
+  textarea.field-input { min-height: 80px; resize: vertical; }
+
+  #detail-actions { display: flex; gap: 12px; margin-top: 20px; }
+  .action-btn {
+    padding: 8px 20px; font-family: inherit; cursor: pointer; font-size: 0.85rem;
+    border: 1px solid #00ff41; background: none; color: #00ff41;
+  }
+  .action-btn:hover { background: #00ff41; color: #0a0a0a; }
+  .action-btn.danger { border-color: #ff4444; color: #ff4444; }
+  .action-btn.danger:hover { background: #ff4444; color: #0a0a0a; }
+
+  /* GRAPH VIEW */
+  #graph-view { flex: 1; display: none; }
+  #graph-view.visible { display: block; }
+  #graph-container { width: 100%; height: 100%; }
+
+  /* ADD MODAL */
+  #modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.85); z-index: 100;
+    align-items: center; justify-content: center;
+  }
+  #modal-overlay.visible { display: flex; }
+  #modal {
+    background: #0d0d0d; border: 1px solid #00ff41;
+    padding: 32px; width: 400px; display: flex; flex-direction: column; gap: 12px;
+  }
+  #modal h2 { font-size: 1rem; letter-spacing: 2px; margin-bottom: 8px; }
+  #modal input, #modal textarea {
+    background: #111; border: 1px solid #222; color: #00ff41;
+    padding: 8px 12px; font-family: inherit; font-size: 0.9rem;
+    width: 100%; outline: none;
+  }
+  #modal input:focus, #modal textarea:focus { border-color: #00ff41; }
+  #modal-actions { display: flex; gap: 12px; margin-top: 8px; }
+  #modal-actions button {
+    flex: 1; padding: 10px; font-family: inherit; cursor: pointer; font-size: 0.9rem;
+  }
+  #modal-save { background: #00ff41; color: #0a0a0a; border: none; font-weight: bold; }
+  #modal-cancel { background: none; border: 1px solid #333; color: #666; }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: #0a0a0a; }
+  ::-webkit-scrollbar-thumb { background: #222; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <h1>[ INFORMATION ]</h1>
+  <input type="email" id="email-input" placeholder="email" />
+  <input type="password" id="pass-input" placeholder="password" />
+  <button onclick="login()">ACCESS</button>
+  <div id="login-error"></div>
+</div>
+
+<!-- MAIN APP -->
+<div id="app">
+  <div id="header">
+    <h1>[ INFORMATION ]</h1>
+    <button onclick="logout()">LOGOUT</button>
+  </div>
+
+  <div id="main">
+    <!-- SIDEBAR -->
+    <div id="sidebar">
+      <div id="sidebar-header">
+        <input type="text" id="search" placeholder="search..." oninput="filterContacts()" />
+        <button id="add-btn" onclick="openModal()">+</button>
+      </div>
+      <div id="contacts-list"></div>
+    </div>
+
+    <!-- CONTENT -->
+    <div id="content">
+      <div id="view-toggle">
+        <button class="view-btn active" onclick="switchView('detail')">DETAIL</button>
+        <button class="view-btn" onclick="switchView('graph')">GRAPH</button>
+      </div>
+
+      <!-- DETAIL VIEW -->
+      <div id="detail-view">
+        <div id="empty-state">← select or add a contact</div>
+        <div id="contact-detail" style="display:none">
+          <div id="contact-name-display"></div>
+
+          <div class="field-group">
+            <div class="field-label">PHONE</div>
+            <input class="field-input" id="edit-phone" placeholder="phone number" />
+          </div>
+          <div class="field-group">
+            <div class="field-label">EMAIL</div>
+            <input class="field-input" id="edit-email" placeholder="email address" />
+          </div>
+          <div class="field-group">
+            <div class="field-label">ADDRESS</div>
+            <input class="field-input" id="edit-address" placeholder="address" />
+          </div>
+          <div class="field-group">
+            <div class="field-label">NOTES</div>
+            <textarea class="field-input" id="edit-notes" placeholder="notes..."></textarea>
+          </div>
+          <div class="field-group">
+            <div class="field-label">RELATIONSHIP</div>
+            <input class="field-input" id="edit-relation" placeholder="e.g. friend, colleague" />
+          </div>
+
+          <div id="detail-actions">
+            <button class="action-btn" onclick="saveContact()">SAVE</button>
+            <button class="action-btn danger" onclick="deleteContact()">DELETE</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- GRAPH VIEW -->
+      <div id="graph-view">
+        <div id="graph-container"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ADD MODAL -->
+<div id="modal-overlay">
+  <div id="modal">
+    <h2>NEW CONTACT</h2>
+    <input type="text" id="modal-name" placeholder="name (required)" />
+    <input type="text" id="modal-phone" placeholder="phone" />
+    <input type="text" id="modal-email-field" placeholder="email" />
+    <input type="text" id="modal-address" placeholder="address" />
+    <input type="text" id="modal-relation" placeholder="relationship" />
+    <textarea id="modal-notes" placeholder="notes..." style="min-height:60px"></textarea>
+    <div id="modal-actions">
+      <button id="modal-cancel" onclick="closeModal()">CANCEL</button>
+      <button id="modal-save" onclick="saveNewContact()">ADD</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── FIREBASE CONFIG ── replace with your actual values ──
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "information-77cb5.firebaseapp.com",
+    projectId: "information-77cb5",
+    storageBucket: "information-77cb5.firebasestorage.app",
+    messagingSenderId: "445804475856",
+    appId: "1:445804475856:web:e4ed5c134c63d23fb675d5",
+    measurementId: "G-BTECZMBPLQ"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  let contacts = [];
+  let selectedId = null;
+  let currentView = 'detail';
+  let network = null;
+
+  // ── AUTH ──
+  auth.onAuthStateChanged(user => {
+    if (user) {
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('app').style.display = 'flex';
+      loadContacts();
+    } else {
+      document.getElementById('login-screen').style.display = 'flex';
+      document.getElementById('app').style.display = 'none';
+    }
+  });
+
+  function login() {
+    const email = document.getElementById('email-input').value;
+    const pass = document.getElementById('pass-input').value;
+    auth.signInWithEmailAndPassword(email, pass)
+      .catch(e => document.getElementById('login-error').textContent = e.message);
+  }
+
+  function logout() {
+    auth.signOut();
+    contacts = [];
+    selectedId = null;
+    document.getElementById('contacts-list').innerHTML = '';
+  }
+
+  // ── FIRESTORE ──
+  function loadContacts() {
+    const uid = auth.currentUser.uid;
+    db.collection('users').doc(uid).collection('contacts')
+      .orderBy('name')
+      .onSnapshot(snap => {
+        contacts = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        renderList(contacts);
+        if (currentView === 'graph') renderGraph();
+      });
+  }
+
+  async function saveNewContact() {
+    const name = document.getElementById('modal-name').value.trim();
+    if (!name) return alert('Name is required');
+    const uid = auth.currentUser.uid;
+    await db.collection('users').doc(uid).collection('contacts').add({
+      name,
+      phone: document.getElementById('modal-phone').value,
+      email: document.getElementById('modal-email-field').value,
+      address: document.getElementById('modal-address').value,
+      relation: document.getElementById('modal-relation').value,
+      notes: document.getElementById('modal-notes').value,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    closeModal();
+  }
+
+  async function saveContact() {
+    if (!selectedId) return;
+    const uid = auth.currentUser.uid;
+    await db.collection('users').doc(uid).collection('contacts').doc(selectedId).update({
+      phone: document.getElementById('edit-phone').value,
+      email: document.getElementById('edit-email').value,
+      address: document.getElementById('edit-address').value,
+      notes: document.getElementById('edit-notes').value,
+      relation: document.getElementById('edit-relation').value,
+    });
+    alert('Saved.');
+  }
+
+  async function deleteContact() {
+    if (!selectedId || !confirm('Delete this contact?')) return;
+    const uid = auth.currentUser.uid;
+    await db.collection('users').doc(uid).collection('contacts').doc(selectedId).delete();
+    selectedId = null;
+    document.getElementById('empty-state').style.display = 'flex';
+    document.getElementById('contact-detail').style.display = 'none';
+  }
+
+  // ── UI ──
+  function renderList(list) {
+    const el = document.getElementById('contacts-list');
+    el.innerHTML = '';
+    list.forEach(c => {
+      const div = document.createElement('div');
+      div.className = 'contact-item' + (c.id === selectedId ? ' active' : '');
+      div.innerHTML = `<div class="name">${c.name}</div><div class="preview">${c.phone || c.email || ''}</div>`;
+      div.onclick = () => selectContact(c.id);
+      el.appendChild(div);
+    });
+  }
+
+  function selectContact(id) {
+    selectedId = id;
+    const c = contacts.find(x => x.id === id);
+    if (!c) return;
+    document.getElementById('empty-state').style.display = 'none';
+    document.getElementById('contact-detail').style.display = 'block';
+    document.getElementById('contact-name-display').textContent = c.name;
+    document.getElementById('edit-phone').value = c.phone || '';
+    document.getElementById('edit-email').value = c.email || '';
+    document.getElementById('edit-address').value = c.address || '';
+    document.getElementById('edit-notes').value = c.notes || '';
+    document.getElementById('edit-relation').value = c.relation || '';
+    renderList(contacts);
+  }
+
+  function filterContacts() {
+    const q = document.getElementById('search').value.toLowerCase();
+    renderList(contacts.filter(c => c.name.toLowerCase().includes(q)));
+  }
+
+  function switchView(view) {
+    currentView = view;
+    document.querySelectorAll('.view-btn').forEach((b, i) => {
+      b.classList.toggle('active', (i === 0 && view === 'detail') || (i === 1 && view === 'graph'));
+    });
+    if (view === 'detail') {
+      document.getElementById('detail-view').classList.remove('hidden');
+      document.getElementById('graph-view').classList.remove('visible');
+    } else {
+      document.getElementById('detail-view').classList.add('hidden');
+      document.getElementById('graph-view').classList.add('visible');
+      renderGraph();
+    }
+  }
+
+  function renderGraph() {
+    const container = document.getElementById('graph-container');
+    const nodes = [{ id: 'me', label: 'YOU', color: { background: '#00ff41', border: '#00ff41' }, font: { color: '#0a0a0a' }, size: 30 }];
+    const edges = [];
+    contacts.forEach(c => {
+      nodes.push({ id: c.id, label: c.name, color: { background: '#111', border: '#00ff41' }, font: { color: '#00ff41' } });
+      edges.push({ from: 'me', to: c.id, label: c.relation || '', color: { color: '#333' }, font: { color: '#444', size: 10 } });
+    });
+    const data = { nodes: new vis.DataSet(nodes), edges: new vis.DataSet(edges) };
+    const options = {
+      background: { color: '#0a0a0a' },
+      nodes: { shape: 'box', borderWidth: 1, font: { face: 'Courier New' } },
+      edges: { smooth: { type: 'curvedCW', roundness: 0.2 } },
+      interaction: { hover: true },
+      physics: { stabilization: true }
+    };
+    if (network) network.destroy();
+    network = new vis.Network(container, data, options);
+    network.on('click', params => {
+      if (params.nodes.length && params.nodes[0] !== 'me') {
+        switchView('detail');
+        selectContact(params.nodes[0]);
+      }
+    });
+  }
+
+  function openModal() {
+    ['modal-name','modal-phone','modal-email-field','modal-address','modal-relation','modal-notes']
+      .forEach(id => document.getElementById(id).value = '');
+    document.getElementById('modal-overlay').classList.add('visible');
+  }
+
+  function closeModal() {
+    document.getElementById('modal-overlay').classList.remove('visible');
+  }
+
+  document.getElementById('pass-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter') login();
+  });
+</script>
+</body>
+</html>
