@@ -397,34 +397,63 @@
 
 function renderGraph() {
   const container = document.getElementById('graph-container');
-
-  // 🔥 IMPORTANT: ensure container has size
-  container.style.height = "500px";
+  container.style.height = '100%';
 
   const nodes = [
     {
       id: 'me',
       label: 'YOU',
+      level: 0,
       color: { background: '#00ff41', border: '#00ff41' },
-      font: { color: '#0a0a0a' },
-      size: 30
+      font: { color: '#0a0a0a', size: 16 },
+      size: 35,
+      shape: 'dot'
     }
   ];
 
   const edges = [];
 
+  // group by relationship
+  const groups = {};
   contacts.forEach(c => {
-    nodes.push({
-      id: c.id,
-      label: c.name,
-      color: { background: '#111', border: '#00ff41' },
-      font: { color: '#00ff41' }
-    });
+    const group = c.relation || 'other';
+    if (!groups[group]) groups[group] = [];
+    groups[group].push(c);
+  });
 
+  Object.entries(groups).forEach(([group, members]) => {
+    const groupId = 'group_' + group;
+    nodes.push({
+      id: groupId,
+      label: group.toUpperCase(),
+      level: 1,
+      color: { background: '#0a0a0a', border: '#00ff41' },
+      font: { color: '#00ff41', size: 13 },
+      shape: 'dot',
+      size: 22
+    });
     edges.push({
       from: 'me',
-      to: c.id,
-      color: { color: '#00ff41' }
+      to: groupId,
+      color: { color: '#00ff41' },
+      width: 2
+    });
+
+    members.forEach(c => {
+      nodes.push({
+        id: c.id,
+        label: c.name,
+        level: 2,
+        color: { background: '#0a0a0a', border: '#444' },
+        font: { color: '#00ff41', size: 11 },
+        shape: 'dot',
+        size: 14
+      });
+      edges.push({
+        from: groupId,
+        to: c.id,
+        color: { color: '#333' }
+      });
     });
   });
 
@@ -434,35 +463,42 @@ function renderGraph() {
   };
 
   const options = {
-    physics: false, // keep OFF for performance
+    layout: {
+      hierarchical: {
+        enabled: true,
+        direction: 'UD',
+        sortMethod: 'directed',
+        levelSeparation: 120,
+        nodeSpacing: 100
+      }
+    },
+    physics: false,
     nodes: {
-      shape: 'dot', // 🔥 more BloodHound style
-      size: 18,
-      font: { color: '#00ff41' },
+      shape: 'dot',
+      font: { face: 'Courier New' },
       borderWidth: 1
     },
     edges: {
       smooth: false,
-      color: '#00ff41'
+      arrows: { to: { enabled: false } }
     },
-    interaction: {
-      hover: true
-    }
+    interaction: { hover: true }
   };
 
-  // 🔥 DON'T destroy every time
   if (!network) {
     network = new vis.Network(container, data, options);
-
     network.on('click', params => {
-      if (params.nodes.length && params.nodes[0] !== 'me') {
-        switchView('detail');
-        selectContact(params.nodes[0]);
+      if (params.nodes.length) {
+        const id = params.nodes[0];
+        if (id !== 'me' && !id.startsWith('group_')) {
+          switchView('detail');
+          selectContact(id);
+        }
       }
     });
-
   } else {
-    network.setData(data); // ✅ update instead of recreate
+    network.setData(data);
+    network.setOptions(options);
   }
 }
   function openModal() {
