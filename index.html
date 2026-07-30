@@ -407,7 +407,11 @@
       nodes: { shape: 'box', borderWidth: 1, font: { face: 'Courier New' } },
       edges: { smooth: { type: 'curvedCW', roundness: 0.2 } },
       interaction: { hover: true },
-      physics: { stabilization: true }
+      physics: {
+  enabled: true,
+  stabilization: { iterations: 100 },
+  barnesHut: { gravitationalConstant: -2000 }
+}
     };
     if (network) network.destroy();
     network = new vis.Network(container, data, options);
