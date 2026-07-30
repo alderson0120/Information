@@ -394,6 +394,7 @@
   }
 
   function renderGraph() {
+   if (network) return;
     const container = document.getElementById('graph-container');
     const nodes = [{ id: 'me', label: 'YOU', color: { background: '#00ff41', border: '#00ff41' }, font: { color: '#0a0a0a' }, size: 30 }];
     const edges = [];
@@ -409,15 +410,16 @@
   interaction: { hover: true },
   physics: false
 };
-    if (network) network.destroy();
-    network = new vis.Network(container, data, options);
-    network.on('click', params => {
-      if (params.nodes.length && params.nodes[0] !== 'me') {
-        switchView('detail');
-        selectContact(params.nodes[0]);
-      }
-    });
-  }
+    if (!network) {
+  network = new vis.Network(container, data, options);
+
+  network.on('click', params => {
+    if (params.nodes.length && params.nodes[0] !== 'me') {
+      switchView('detail');
+      selectContact(params.nodes[0]);
+    }
+  });
+}
 
   function openModal() {
     ['modal-name','modal-phone','modal-email-field','modal-address','modal-relation','modal-notes']
